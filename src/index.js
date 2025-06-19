@@ -18,11 +18,13 @@ import authRoutes from './routes/authRoutes.js'; // Asegúrate que la ruta es co
 import estudiantesRoutes from './routes/estudiantesRoutes.js';
 import candidatosRoutes from './routes/candidatosRoutes.js';
 import votacionesRoutes from './routes/votacionesRoutes.js';
+import votosRoutes from './routes/votosRoutes.js';
 
 // Importar modelos para crear tablas
 import Estudiante from './models/Estudiante.js';
 import Candidato from './models/Candidato.js';
 import Votacion from './models/Votacion.js';
+import Voto from './models/Voto.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -41,30 +43,14 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // Crear carpeta uploads si no existe
-const uploadDir = path.join(__dirname, 'uploads');
+const uploadDir = path.join(__dirname, '..', 'uploads');
 console.log('Upload directory path:', uploadDir);
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Servir archivos estáticos - Modificar esta parte
-app.use('/uploads', (req, res, next) => {
-  const fileName = req.path.replace(/^\//, ''); 
-  console.log(`📁 Accessing file: ${fileName}`);
-  
-  const filePath = path.join(uploadDir, fileName);
-  console.log('Full file path:', filePath);
-  
-  if (!fs.existsSync(filePath)) {
-    console.log(`❌ File not found: ${filePath}`);
-    return res.status(404).send('File not found');
-  }
-  
-  next();
-}, express.static(uploadDir));
-
-app.get('/api/uploads', (req, res) => {
+app.get('/uploads', (req, res) => {
   fs.readdir(uploadDir, (err, files) => {
     if (err) {
       return res.status(500).json({ error: 'Error reading uploads directory' });
@@ -72,6 +58,8 @@ app.get('/api/uploads', (req, res) => {
     res.json({ files });
   });
 });
+
+app.use('/uploads', express.static(uploadDir));
 
 app.get('/test-image/:filename', (req, res) => {
   const filePath = path.join(uploadDir, req.params.filename);
@@ -90,6 +78,7 @@ const initializeDatabase = async () => {
     await Estudiante.createTable();
     await Candidato.createTable();
     await Votacion.createTable();
+    await Voto.createTable();
     console.log('✅ Tablas verificadas/creadas correctamente');
   } catch (error) {
     console.error('❌ Error al crear tablas:', error.message);
@@ -101,7 +90,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/estudiantes', estudiantesRoutes);
 app.use('/api/candidatos', candidatosRoutes);
 app.use('/api/votaciones', votacionesRoutes);
-// app.use('/api/votacion', votacionRoutes);
+app.use('/api/votos', votosRoutes);
 
 // Ruta de prueba
 app.get('/', (req, res) => {
