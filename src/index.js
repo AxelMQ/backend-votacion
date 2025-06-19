@@ -17,11 +17,12 @@ dotenv.config();
 import authRoutes from './routes/authRoutes.js'; // Asegúrate que la ruta es correcta
 import estudiantesRoutes from './routes/estudiantesRoutes.js';
 import candidatosRoutes from './routes/candidatosRoutes.js';
-// import votacionRoutes from './routes/votacionRoutes.js';
+import votacionesRoutes from './routes/votacionesRoutes.js';
 
 // Importar modelos para crear tablas
 import Estudiante from './models/Estudiante.js';
 import Candidato from './models/Candidato.js';
+import Votacion from './models/Votacion.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -30,8 +31,9 @@ const PORT = process.env.PORT || 3001;
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3001',
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Disposition']
 }));
 
 // Configuración básica
@@ -40,16 +42,54 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Crear carpeta uploads si no existe
 const uploadDir = path.join(__dirname, 'uploads');
+console.log('Upload directory path:', uploadDir);
+
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
-app.use('/uploads', express.static(uploadDir));
+
+// Servir archivos estáticos - Modificar esta parte
+app.use('/uploads', (req, res, next) => {
+  const fileName = req.path.replace(/^\//, ''); 
+  console.log(`📁 Accessing file: ${fileName}`);
+  
+  const filePath = path.join(uploadDir, fileName);
+  console.log('Full file path:', filePath);
+  
+  if (!fs.existsSync(filePath)) {
+    console.log(`❌ File not found: ${filePath}`);
+    return res.status(404).send('File not found');
+  }
+  
+  next();
+}, express.static(uploadDir));
+
+app.get('/api/uploads', (req, res) => {
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error reading uploads directory' });
+    }
+    res.json({ files });
+  });
+});
+
+app.get('/test-image/:filename', (req, res) => {
+  const filePath = path.join(uploadDir, req.params.filename);
+  if (fs.existsSync(filePath)) {
+    console.log(`✅ Serving test image: ${req.params.filename}`);
+    res.sendFile(filePath);
+  } else {
+    console.log(`❌ Test image not found: ${req.params.filename}`);
+    res.status(404).json({ message: 'Image not found' });
+  }
+});
 
 // Crear tablas al iniciar (solo en desarrollo)
 const initializeDatabase = async () => {
   try {
     await Estudiante.createTable();
     await Candidato.createTable();
+    await Votacion.createTable();
     console.log('✅ Tablas verificadas/creadas correctamente');
   } catch (error) {
     console.error('❌ Error al crear tablas:', error.message);
@@ -60,6 +100,7 @@ const initializeDatabase = async () => {
 app.use('/api/auth', authRoutes);
 app.use('/api/estudiantes', estudiantesRoutes);
 app.use('/api/candidatos', candidatosRoutes);
+app.use('/api/votaciones', votacionesRoutes);
 // app.use('/api/votacion', votacionRoutes);
 
 // Ruta de prueba
